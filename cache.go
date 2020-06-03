@@ -2,7 +2,6 @@ package simplecache
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 )
@@ -77,13 +76,14 @@ func (c *CacheMap) Set(key string, val interface{}, expire time.Duration) error 
 	}
 
 	c.rw.Lock()
-	_, found := c.items[key]
-	if !found {
-		c.nbytes += uint64(len(key) + GetRealSizeOf(val))
-
-		if c.nbytes > c.maxMemory {
-			return errors.New(ErrMemLimit)
-		}
+	i, found := c.items[key]
+	if found {
+		c.nbytes -= uint64(len(key) + GetRealSizeOf(i.data))
+	}
+	c.nbytes += uint64(len(key) + GetRealSizeOf(val))
+	if c.nbytes > c.maxMemory {
+		c.rw.Unlock()
+		return errors.New(ErrMemLimit)
 	}
 
 	c.items[key] = item{
@@ -175,7 +175,6 @@ func (c *CacheMap) GC() {
 					c.Del(key)
 				}
 			}
-			log.Println("GC")
 		}
 	}
 }
